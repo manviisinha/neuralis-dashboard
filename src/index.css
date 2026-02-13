@@ -54,6 +54,12 @@
     --neurora-glass: 240 18% 14%;
     --neurora-glass-border: 240 12% 25%;
 
+    /* Premium tokens */
+    --neurora-gold: 43 96% 56%;
+    --neurora-gold-dark: 38 80% 42%;
+    --neurora-amethyst: 270 60% 58%;
+    --neurora-amethyst-light: 270 70% 72%;
+
     --font-display: 'Space Grotesk', sans-serif;
     --font-body: 'Plus Jakarta Sans', sans-serif;
   }
@@ -111,6 +117,32 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  .text-gradient-gold {
+    background: linear-gradient(135deg, hsl(var(--neurora-gold)), hsl(var(--neurora-amethyst-light)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .glow-gold {
+    box-shadow: 0 0 20px hsl(var(--neurora-gold) / 0.35),
+                0 0 40px hsl(var(--neurora-gold) / 0.12);
+  }
+
+  .glow-amethyst {
+    box-shadow: 0 0 20px hsl(var(--neurora-amethyst) / 0.35),
+                0 0 40px hsl(var(--neurora-amethyst) / 0.12);
+  }
+
+  .glass-card-premium {
+    @apply rounded-xl;
+    background: hsl(var(--neurora-glass) / 0.6);
+    backdrop-filter: blur(20px);
+    border: 1px solid hsl(var(--neurora-gold) / 0.25);
+    box-shadow: 0 8px 32px hsl(var(--neurora-gold) / 0.08),
+                0 2px 8px hsl(0 0% 0% / 0.3);
   }
 }
 

@@ -69,6 +69,10 @@ export default {
           danger: "hsl(var(--neurora-danger))",
           glass: "hsl(var(--neurora-glass))",
           "glass-border": "hsl(var(--neurora-glass-border))",
+          gold: "hsl(var(--neurora-gold))",
+          "gold-dark": "hsl(var(--neurora-gold-dark))",
+          amethyst: "hsl(var(--neurora-amethyst))",
+          "amethyst-light": "hsl(var(--neurora-amethyst-light))",
         },
       },
       borderRadius: {

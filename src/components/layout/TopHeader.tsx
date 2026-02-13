@@ -1,5 +1,6 @@
-import { Menu, Search, Bell } from "lucide-react";
+import { Menu, Search, Bell, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FamilySwitcher } from "@/components/FamilySwitcher";
 
 interface Props {
   onToggleSidebar: () => void;
@@ -23,12 +24,16 @@ export function TopHeader({ onToggleSidebar }: Props) {
       </div>
 
       <div className="flex items-center gap-3">
+        <FamilySwitcher />
         <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
           <Bell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-neurora-amber" />
         </Button>
-        <div className="w-9 h-9 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center">
+        <div className="w-9 h-9 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center relative">
           <span className="text-sm font-display font-semibold text-primary">DR</span>
+          <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-neurora-gold flex items-center justify-center">
+            <Crown className="w-2.5 h-2.5 text-white" />
+          </div>
         </div>
       </div>
     </header>
