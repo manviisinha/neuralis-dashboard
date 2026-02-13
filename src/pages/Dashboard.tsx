@@ -3,27 +3,27 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { MoleculeVisualization } from "@/components/MoleculeVisualization";
 
 const healthData = [
-  { month: "Jan", value: 72, zone: "stable" },
-  { month: "Feb", value: 75, zone: "improved" },
-  { month: "Mar", value: 71, zone: "stable" },
-  { month: "Apr", value: 68, zone: "degraded" },
-  { month: "May", value: 74, zone: "improved" },
-  { month: "Jun", value: 78, zone: "improved" },
-  { month: "Jul", value: 76, zone: "stable" },
-];
+{ month: "Jan", value: 72, zone: "stable" },
+{ month: "Feb", value: 75, zone: "improved" },
+{ month: "Mar", value: 71, zone: "stable" },
+{ month: "Apr", value: 68, zone: "degraded" },
+{ month: "May", value: 74, zone: "improved" },
+{ month: "Jun", value: 78, zone: "improved" },
+{ month: "Jul", value: 76, zone: "stable" }];
+
 
 const stats = [
-  { label: "Heart Rate", value: "72 bpm", icon: Heart, trend: "stable" },
-  { label: "Blood Pressure", value: "120/80", icon: Activity, trend: "improved" },
-  { label: "Temperature", value: "98.6°F", icon: Thermometer, trend: "stable" },
-  { label: "SpO2", value: "98%", icon: Droplets, trend: "improved" },
-];
+{ label: "Heart Rate", value: "72 bpm", icon: Heart, trend: "stable" },
+{ label: "Blood Pressure", value: "120/80", icon: Activity, trend: "improved" },
+{ label: "Temperature", value: "98.6°F", icon: Thermometer, trend: "stable" },
+{ label: "SpO2", value: "98%", icon: Droplets, trend: "improved" }];
+
 
 const conflicts = [
-  { drug1: "Warfarin", drug2: "Aspirin", severity: "high", desc: "Increased bleeding risk" },
-  { drug2: "Metformin", drug1: "Lisinopril", severity: "moderate", desc: "Monitor renal function" },
-  { drug1: "Atorvastatin", drug2: "Amlodipine", severity: "low", desc: "Generally safe" },
-];
+{ drug1: "Warfarin", drug2: "Aspirin", severity: "high", desc: "Increased bleeding risk" },
+{ drug2: "Metformin", drug1: "Lisinopril", severity: "moderate", desc: "Monitor renal function" },
+{ drug1: "Atorvastatin", drug2: "Amlodipine", severity: "low", desc: "Generally safe" }];
+
 
 const trendIcon = (t: string) => {
   if (t === "improved") return <TrendingUp className="w-4 h-4 text-neurora-mint" />;
@@ -47,20 +47,20 @@ export default function Dashboard() {
 
       {/* Quick Stats Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => (
-          <div key={stat.label} className="glass-card p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <stat.icon className="w-5 h-5 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-muted-foreground">{stat.label}</p>
-              <div className="flex items-center gap-2">
-                <p className="text-lg font-display font-semibold text-foreground">{stat.value}</p>
-                {trendIcon(stat.trend)}
-              </div>
-            </div>
-          </div>
-        ))}
+        {stats.map((stat) => {}
+
+
+
+
+
+
+
+
+
+
+
+
+        )}
       </div>
 
       {/* Bento Grid */}
@@ -80,15 +80,15 @@ export default function Dashboard() {
         <div className="glass-card p-5 lg:col-span-1">
           <h2 className="text-sm font-display font-semibold text-muted-foreground uppercase tracking-wider mb-4">Conflict Shield</h2>
           <div className="space-y-3">
-            {conflicts.map((c, i) => (
-              <div key={i} className={`rounded-lg border p-3 ${severityColor(c.severity)} ${c.severity === "high" ? "animate-pulse-glow" : ""}`}>
+            {conflicts.map((c, i) =>
+            <div key={i} className={`rounded-lg border p-3 ${severityColor(c.severity)} ${c.severity === "high" ? "animate-pulse-glow" : ""}`}>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-display font-semibold">{c.drug1} × {c.drug2}</span>
                   <span className="text-xs uppercase font-semibold tracking-wider">{c.severity}</span>
                 </div>
                 <p className="text-xs opacity-80">{c.desc}</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
 
@@ -113,15 +113,15 @@ export default function Dashboard() {
                     border: "1px solid hsl(240, 12%, 25%)",
                     borderRadius: "8px",
                     color: "hsl(220, 20%, 92%)",
-                    fontSize: 12,
-                  }}
-                />
+                    fontSize: 12
+                  }} />
+
                 <Area type="monotone" dataKey="value" stroke="hsl(260, 58%, 53%)" strokeWidth={2} fill="url(#healthGradient)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 }
