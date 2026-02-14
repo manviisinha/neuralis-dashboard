@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { FamilyProvider } from "./contexts/FamilyContext";
 import LandingPage from "./pages/LandingPage";
+import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Prescriptions from "./pages/Prescriptions";
 import ConflictEngine from "./pages/ConflictEngine";
@@ -25,6 +26,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<LandingPage />} />
+            <Route path="/auth" element={<Auth />} />
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/prescriptions" element={<Prescriptions />} />
