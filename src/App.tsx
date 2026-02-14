@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { FamilyProvider } from "./contexts/FamilyContext";
+import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
 import Prescriptions from "./pages/Prescriptions";
 import ConflictEngine from "./pages/ConflictEngine";
@@ -13,7 +14,6 @@ import Pricing from "./pages/Pricing";
 import ExpertLocator from "./pages/ExpertLocator";
 import Subscription from "./pages/Subscription";
 import NotFound from "./pages/NotFound";
-
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -24,8 +24,9 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            <Route path="/" element={<LandingPage />} />
             <Route element={<AppLayout />}>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/prescriptions" element={<Prescriptions />} />
               <Route path="/conflicts" element={<ConflictEngine />} />
               <Route path="/lab-analytics" element={<LabAnalytics />} />

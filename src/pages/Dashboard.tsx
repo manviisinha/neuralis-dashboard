@@ -47,20 +47,18 @@ export default function Dashboard() {
 
       {/* Quick Stats Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => {}
-
-
-
-
-
-
-
-
-
-
-
-
-        )}
+        {stats.map((stat) => (
+          <div key={stat.label} className="glass-card p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <stat.icon className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-muted-foreground font-display uppercase tracking-wider">{stat.label}</p>
+              <p className="text-lg font-display font-bold">{stat.value}</p>
+            </div>
+            {trendIcon(stat.trend)}
+          </div>
+        ))}
       </div>
 
       {/* Bento Grid */}
