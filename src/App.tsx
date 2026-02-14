@@ -15,6 +15,7 @@ import Pricing from "./pages/Pricing";
 import ExpertLocator from "./pages/ExpertLocator";
 import Subscription from "./pages/Subscription";
 import NotFound from "./pages/NotFound";
+import Settings from "./pages/Settings";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -35,6 +36,7 @@ const App = () => (
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/expert-locator" element={<ExpertLocator />} />
               <Route path="/subscription" element={<Subscription />} />
+              <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

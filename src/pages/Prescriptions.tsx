@@ -1,108 +1,178 @@
-import { useState } from "react";
-import { Upload, FileText, Pill, Clock, Hash } from "lucide-react";
-import { BrainPulseLoader } from "@/components/BrainPulseLoader";
+import { useState, useEffect } from "react";
+import { Plus, Search, Filter, FileText, Pill, AlertTriangle, Clock, Calendar, Check, MoreVertical, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { PrescriptionUpload } from "@/components/PrescriptionUpload";
+import { useFamily } from "@/contexts/FamilyContext";
+import { collection, query, onSnapshot, deleteDoc, doc, orderBy } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
+import { useToast } from "@/hooks/use-toast";
 
-interface ParsedMed {
+interface Medication {
+  id: string;
   name: string;
   dosage: string;
   frequency: string;
+  description?: string;
+  category?: string;
+  prescribedAt: any;
+  status: "active" | "discontinued";
 }
 
-const mockParsed: ParsedMed[] = [
-  { name: "Metformin", dosage: "500mg", frequency: "Twice daily" },
-  { name: "Lisinopril", dosage: "10mg", frequency: "Once daily" },
-  { name: "Atorvastatin", dosage: "20mg", frequency: "Once at bedtime" },
-];
-
 export default function Prescriptions() {
-  const [state, setState] = useState<"idle" | "scanning" | "done">("idle");
+  const [showUpload, setShowUpload] = useState(false);
+  const [medications, setMedications] = useState<Medication[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const handleUpload = () => {
-    setState("scanning");
-    setTimeout(() => setState("done"), 3000);
+  const { activeMember } = useFamily();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!auth.currentUser || !activeMember) return;
+
+    // Determine path
+    let collectionPath = "";
+    if (activeMember.isPrimary) {
+      collectionPath = `users/${auth.currentUser.uid}/medications`;
+    } else {
+      collectionPath = `users/${auth.currentUser.uid}/family_members/${activeMember.id}/medications`;
+    }
+
+    const q = query(collection(db, collectionPath), orderBy("prescribedAt", "desc"));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const p = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Medication[];
+      setMedications(p);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching meds:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [activeMember]);
+
+  const handleDelete = async (id: string) => {
+    if (!auth.currentUser || !activeMember) return;
+    try {
+      let collectionPath = "";
+      if (activeMember.isPrimary) {
+        collectionPath = `users/${auth.currentUser.uid}/medications`;
+      } else {
+        collectionPath = `users/${auth.currentUser.uid}/family_members/${activeMember.id}/medications`;
+      }
+      await deleteDoc(doc(db, collectionPath, id));
+      toast({ title: "Medication Removed", description: "The medication has been deleted." });
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast({ title: "Error", description: "Could not delete medication.", variant: "destructive" });
+    }
   };
 
+  const filteredMeds = medications.filter(m =>
+    m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    m.category?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <div className="space-y-6 animate-fade-in-up max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-display font-bold text-foreground">Prescription Parsing</h1>
-        <p className="text-sm text-muted-foreground mt-1">Upload a prescription to extract medication data</p>
-      </div>
-
-      {/* Upload Zone */}
-      <div
-        onClick={state === "idle" ? handleUpload : undefined}
-        className={`glass-card relative overflow-hidden cursor-pointer transition-all ${state === "idle" ? "hover:border-primary/50" : ""}`}
-      >
-        <div className="p-12 flex flex-col items-center justify-center text-center">
-          {state === "idle" && (
-            <>
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-                <Upload className="w-8 h-8 text-primary" />
-              </div>
-              <p className="text-foreground font-display font-semibold">Drop prescription image here</p>
-              <p className="text-sm text-muted-foreground mt-1">or click to simulate upload</p>
-            </>
-          )}
-
-          {state === "scanning" && (
-            <div className="relative w-full">
-              {/* Simulated prescription image */}
-              <div className="w-full h-48 rounded-lg bg-secondary/30 border border-border/20 flex items-center justify-center relative overflow-hidden">
-                <FileText className="w-12 h-12 text-muted-foreground/40" />
-                {/* Laser scan line */}
-                <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent animate-laser-scan" />
-              </div>
-              <div className="mt-4">
-                <BrainPulseLoader text="Parsing prescription..." />
-              </div>
-            </div>
-          )}
-
-          {state === "done" && (
-            <div className="w-full text-left">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-neurora-mint/10 flex items-center justify-center">
-                  <FileText className="w-4 h-4 text-neurora-mint" />
-                </div>
-                <p className="font-display font-semibold text-neurora-mint">Scan Complete</p>
-              </div>
-              <p className="text-xs text-muted-foreground mb-1">Click anywhere to reset</p>
-            </div>
-          )}
+    <div className="space-y-6 animate-fade-in-up">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-display font-bold text-foreground">Prescriptions</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {activeMember?.isPrimary ? "Manage your medications" : `Medications for ${activeMember?.name}`}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setShowUpload(!showUpload)}
+            className={showUpload ? "bg-secondary text-foreground hover:bg-secondary/80" : "glow-indigo"}
+          >
+            {showUpload ? "Cancel Upload" : <><Plus className="w-4 h-4 mr-2" /> Add Prescription</>}
+          </Button>
         </div>
       </div>
 
-      {/* Parsed Results */}
-      {state === "done" && (
-        <div className="grid gap-4 sm:grid-cols-3">
-          {mockParsed.map((med, i) => (
-            <div key={i} className="glass-card p-4 animate-fade-in-up" style={{ animationDelay: `${i * 100}ms` }}>
-              <div className="flex items-center gap-2 mb-3">
-                <Pill className="w-4 h-4 text-primary" />
-                <h3 className="font-display font-semibold text-foreground">{med.name}</h3>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Hash className="w-3 h-3" />
-                  <span>{med.dosage}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="w-3 h-3" />
-                  <span>{med.frequency}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-          <button
-            onClick={() => setState("idle")}
-            className="glass-card p-4 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
-          >
-            <Upload className="w-5 h-5 mr-2" />
-            <span className="text-sm font-display">Scan Another</span>
-          </button>
+      {showUpload && (
+        <div className="mb-8">
+          <PrescriptionUpload onSuccess={() => setShowUpload(false)} />
         </div>
       )}
+
+      {/* Search & Stats */}
+      {!showUpload && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="md:col-span-2 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search medications..."
+              className="pl-9 bg-background/50 border-border/40"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="glass-card p-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-neurora-mint/10 text-neurora-mint"><Pill className="w-4 h-4" /></div>
+              <span className="text-sm font-medium">Active</span>
+            </div>
+            <span className="text-lg font-bold">{medications.length}</span>
+          </div>
+          <div className="glass-card p-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-neurora-amber/10 text-neurora-amber"><AlertTriangle className="w-4 h-4" /></div>
+              <span className="text-sm font-medium">Conflicts</span>
+            </div>
+            <span className="text-lg font-bold">0</span>
+          </div>
+        </div>
+      )}
+
+      {/* Medication List */}
+      <div className="grid gap-4">
+        {loading ? (
+          <div className="text-center py-12 text-muted-foreground">Loading prescriptions...</div>
+        ) : filteredMeds.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground italic">
+            No medications found. Upload a prescription to get started.
+          </div>
+        ) : (
+          filteredMeds.map((med) => (
+            <div key={med.id} className="glass-card p-4 flex flex-col md:flex-row md:items-center gap-4 group">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-display font-bold text-lg text-foreground">{med.name}</h3>
+                  {med.category && <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground uppercase tracking-wider">{med.category}</span>}
+                </div>
+                <p className="text-sm text-muted-foreground line-clamp-1">{med.description || "No description available."}</p>
+              </div>
+
+              <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1.5 min-w-[100px]">
+                  <Pill className="w-4 h-4 text-primary/70" />
+                  <span>{med.dosage}</span>
+                </div>
+                <div className="flex items-center gap-1.5 min-w-[120px]">
+                  <Clock className="w-4 h-4 text-neurora-indigo/70" />
+                  <span>{med.frequency}</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => handleDelete(med.id)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

@@ -1,19 +1,29 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
+import { auth, db } from "@/lib/firebase";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  sendEmailVerification,
+  GoogleAuthProvider,
+  signInWithPopup
+} from "firebase/auth";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import { Brain, ArrowRight, Eye, EyeOff, Mail, Lock, User, Phone, Calendar, Droplets, Heart, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
-type Mode = "login" | "signup";
+type Mode = "login" | "signup" | "forgot-password";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const GENDERS = ["Male", "Female", "Other", "Prefer not to say"];
 
 export default function Auth() {
-  const [mode, setMode] = useState<Mode>("login");
+  const [searchParams] = useSearchParams();
+  const [mode, setMode] = useState<Mode>(searchParams.get("mode") === "signup" ? "signup" : "login");
   const [step, setStep] = useState(1); // 1 = credentials, 2 = patient details
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -37,12 +47,64 @@ export default function Auth() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) {
-      toast({ title: "Login failed", description: error.message, variant: "destructive" });
-    } else {
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      toast({ title: "Welcome back!", description: "Successfully logged in." });
       navigate("/dashboard");
+    } catch (error: any) {
+      console.error("Login Error:", error);
+      toast({ title: "Login failed", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Check if user profile exists, if not create one
+      const docRef = doc(db, "users", user.uid);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        await setDoc(docRef, {
+          uid: user.uid,
+          email: user.email,
+          full_name: user.displayName,
+          photo_url: user.photoURL,
+          created_at: new Date().toISOString()
+        });
+      }
+
+      toast({ title: "Welcome back!", description: `Successfully logged in as ${user.displayName || user.email}` });
+      navigate("/dashboard");
+    } catch (error: any) {
+      console.error("Google Login Error:", error);
+      toast({ title: "Google Login failed", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      toast({ title: "Email required", description: "Please enter your email address.", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast({ title: "Email sent", description: "Check your inbox for password reset instructions." });
+      setMode("login");
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -63,24 +125,18 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: window.location.origin,
-        data: { full_name: fullName },
-      },
-    });
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
 
-    if (error) {
-      setLoading(false);
-      toast({ title: "Signup failed", description: error.message, variant: "destructive" });
-      return;
-    }
+      // Send verification email
+      await sendEmailVerification(user);
 
-    // Update profile with patient details
-    if (data.user) {
-      await supabase.from("profiles").update({
+      // Save user profile to Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        email: user.email,
+        full_name: fullName,
         date_of_birth: dateOfBirth || null,
         gender: gender || null,
         blood_group: bloodGroup || null,
@@ -88,16 +144,22 @@ export default function Auth() {
         emergency_contact: emergencyContact || null,
         medical_conditions: medicalConditions || null,
         allergies: allergies || null,
-      }).eq("user_id", data.user.id);
-    }
+        created_at: new Date().toISOString()
+      });
 
-    setLoading(false);
-    toast({
-      title: "Account created!",
-      description: "Please check your email to verify your account before signing in.",
-    });
-    setMode("login");
-    setStep(1);
+      toast({
+        title: "Account created!",
+        description: "Please check your email to verify your account before logging in.",
+      });
+
+      setMode("login");
+      setStep(1);
+    } catch (error: any) {
+      console.error(error);
+      toast({ title: "Signup failed", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const resetForm = () => {
@@ -131,150 +193,279 @@ export default function Auth() {
         </Link>
 
         <div className="glass-card p-8">
-          {/* Mode tabs */}
-          <div className="flex rounded-lg bg-secondary/30 p-1 mb-6">
+          {/* Mode tabs with sliding indicator */}
+          <div className="relative flex rounded-xl bg-secondary/40 p-1 mb-8">
+            <div
+              className={`absolute inset-y-1 w-[calc(50%-4px)] rounded-lg bg-background shadow-sm transition-all duration-300 ease-spring ${mode === "login" || mode === "forgot-password" ? "left-1" : "left-[calc(50%)]"
+                }`}
+            />
             <button
               onClick={() => { setMode("login"); resetForm(); }}
-              className={`flex-1 py-2 text-sm font-display font-semibold rounded-md transition-all ${mode === "login" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              className={`relative flex-1 py-2.5 text-sm font-display font-medium transition-colors z-10 ${mode === "login" || mode === "forgot-password" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               Log In
             </button>
             <button
               onClick={() => { setMode("signup"); resetForm(); }}
-              className={`flex-1 py-2 text-sm font-display font-semibold rounded-md transition-all ${mode === "signup" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              className={`relative flex-1 py-2.5 text-sm font-display font-medium transition-colors z-10 ${mode === "signup" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               Sign Up
             </button>
           </div>
 
-          {/* LOGIN */}
-          {mode === "login" && (
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="login-email" className="text-sm font-display">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input id="login-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10 bg-secondary/30 border-border/30" required />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="login-password" className="text-sm font-display">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input id="login-password" type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 pr-10 bg-secondary/30 border-border/30" required />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-              <Button type="submit" className="w-full glow-indigo" size="lg" disabled={loading}>
-                {loading ? "Signing in..." : "Sign In"} <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
-            </form>
-          )}
-
-          {/* SIGNUP STEP 1 */}
-          {mode === "signup" && step === 1 && (
-            <form onSubmit={handleSignupStep1} className="space-y-4">
-              <p className="text-xs text-muted-foreground font-display uppercase tracking-wider mb-2">Step 1 of 2 — Account</p>
-              <div className="space-y-2">
-                <Label htmlFor="signup-name" className="text-sm font-display">Full Name *</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input id="signup-name" placeholder="John Doe" value={fullName} onChange={(e) => setFullName(e.target.value)} className="pl-10 bg-secondary/30 border-border/30" required />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-email" className="text-sm font-display">Email *</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input id="signup-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10 bg-secondary/30 border-border/30" required />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-password" className="text-sm font-display">Password *</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input id="signup-password" type={showPassword ? "text" : "password"} placeholder="Min 6 characters" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 pr-10 bg-secondary/30 border-border/30" required minLength={6} />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-              <Button type="submit" className="w-full glow-indigo" size="lg">
-                Continue <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </form>
-          )}
-
-          {/* SIGNUP STEP 2 — Patient Details */}
-          {mode === "signup" && step === 2 && (
-            <form onSubmit={handleSignupStep2} className="space-y-4">
-              <div className="flex items-center gap-2 mb-2">
-                <button type="button" onClick={() => setStep(1)} className="text-muted-foreground hover:text-foreground">
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <p className="text-xs text-muted-foreground font-display uppercase tracking-wider">Step 2 of 2 — Patient Details</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-display">Date of Birth</Label>
+          <div className="relative min-h-[300px]">
+            {/* LOGIN */}
+            {mode === "login" && (
+              <form key="login" onSubmit={handleLogin} className="space-y-5 animate-fade-in-up">
+                <div className="space-y-2 group">
+                  <Label htmlFor="login-email" className="text-sm font-display text-muted-foreground group-focus-within:text-primary transition-colors">Email</Label>
                   <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} className="pl-10 bg-secondary/30 border-border/30 text-sm" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Input
+                      id="login-email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10 bg-secondary/20 border-border/40 focus:bg-background transition-all duration-300"
+                      required
+                    />
                   </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-display">Gender</Label>
-                  <select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full h-10 rounded-md bg-secondary/30 border border-border/30 px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50">
-                    <option value="">Select</option>
-                    {GENDERS.map((g) => <option key={g} value={g}>{g}</option>)}
-                  </select>
+                <div className="space-y-2 group">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="login-password" className="text-sm font-display text-muted-foreground group-focus-within:text-primary transition-colors">Password</Label>
+                    <button type="button" onClick={() => setMode("forgot-password")} className="text-xs text-primary hover:text-primary/80 transition-colors">Forgot?</button>
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Input
+                      id="login-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-10 pr-10 bg-secondary/20 border-border/40 focus:bg-background transition-all duration-300"
+                      required
+                    />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
-              </div>
+                <Button type="submit" className="w-full glow-indigo h-11 text-base" size="lg" disabled={loading}>
+                  {loading ? "Signing in..." : "Sign In"} <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-display flex items-center gap-1"><Droplets className="w-3 h-3" /> Blood Group</Label>
-                  <select value={bloodGroup} onChange={(e) => setBloodGroup(e.target.value)} className="w-full h-10 rounded-md bg-secondary/30 border border-border/30 px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50">
-                    <option value="">Select</option>
-                    {BLOOD_GROUPS.map((bg) => <option key={bg} value={bg}>{bg}</option>)}
-                  </select>
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border/50" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-display flex items-center gap-1"><Phone className="w-3 h-3" /> Phone</Label>
-                  <Input type="tel" placeholder="+1 (555) 000-0000" value={phone} onChange={(e) => setPhone(e.target.value)} className="bg-secondary/30 border-border/30 text-sm" />
+
+                <div className="grid grid-cols-1 gap-3">
+                  <Button type="button" variant="outline" onClick={handleGoogleLogin} disabled={loading} className="w-full">
+                    <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
+                      <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
+                    </svg>
+                    Google
+                  </Button>
                 </div>
-              </div>
+              </form>
+            )}
 
-              <div className="space-y-1.5">
-                <Label className="text-xs font-display flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Emergency Contact</Label>
-                <Input placeholder="Name & phone number" value={emergencyContact} onChange={(e) => setEmergencyContact(e.target.value)} className="bg-secondary/30 border-border/30 text-sm" />
-              </div>
+            {/* FORGOT PASSWORD */}
+            {mode === "forgot-password" && (
+              <form key="forgot-password" onSubmit={handleForgotPassword} className="space-y-5 animate-fade-in-up">
+                <div className="flex items-center gap-2 mb-2">
+                  <button type="button" onClick={() => setMode("login")} className="text-muted-foreground hover:text-foreground transition-colors p-1 -ml-1">
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <p className="text-xs text-muted-foreground font-display uppercase tracking-wider">Reset Password</p>
+                </div>
+                <div className="space-y-2 group">
+                  <Label htmlFor="forgot-email" className="text-sm font-display text-muted-foreground group-focus-within:text-primary transition-colors">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Input
+                      id="forgot-email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10 bg-secondary/20 border-border/40 focus:bg-background transition-all duration-300"
+                      required
+                    />
+                  </div>
+                </div>
+                <Button type="submit" className="w-full glow-indigo h-11 text-base" size="lg" disabled={loading}>
+                  {loading ? "Sending..." : "Send Reset Link"} <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
+              </form>
+            )}
 
-              <div className="space-y-1.5">
-                <Label className="text-xs font-display flex items-center gap-1"><Heart className="w-3 h-3" /> Existing Medical Conditions</Label>
-                <textarea placeholder="e.g. Diabetes, Hypertension..." value={medicalConditions} onChange={(e) => setMedicalConditions(e.target.value)} className="w-full min-h-[60px] rounded-md bg-secondary/30 border border-border/30 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none" />
-              </div>
+            {/* SIGNUP STEP 1 */}
+            {mode === "signup" && step === 1 && (
+              <form key="signup-step-1" onSubmit={handleSignupStep1} className="space-y-5 animate-fade-in-up">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="h-1 flex-1 bg-primary rounded-full"></div>
+                  <div className="h-1 flex-1 bg-secondary rounded-full"></div>
+                </div>
+                <p className="text-xs text-muted-foreground font-display uppercase tracking-wider mb-4">Account Creation</p>
 
-              <div className="space-y-1.5">
-                <Label className="text-xs font-display">Known Allergies</Label>
-                <textarea placeholder="e.g. Penicillin, Peanuts..." value={allergies} onChange={(e) => setAllergies(e.target.value)} className="w-full min-h-[60px] rounded-md bg-secondary/30 border border-border/30 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none" />
-              </div>
+                <div className="space-y-2 group">
+                  <Label htmlFor="signup-name" className="text-sm font-display text-muted-foreground group-focus-within:text-primary transition-colors">Full Name</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Input
+                      id="signup-name"
+                      placeholder="John Doe"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="pl-10 bg-secondary/20 border-border/40 focus:bg-background transition-all duration-300"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2 group">
+                  <Label htmlFor="signup-email" className="text-sm font-display text-muted-foreground group-focus-within:text-primary transition-colors">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Input
+                      id="signup-email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10 bg-secondary/20 border-border/40 focus:bg-background transition-all duration-300"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2 group">
+                  <Label htmlFor="signup-password" className="text-sm font-display text-muted-foreground group-focus-within:text-primary transition-colors">Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Input
+                      id="signup-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Min 6 characters"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-10 pr-10 bg-secondary/20 border-border/40 focus:bg-background transition-all duration-300"
+                      required
+                      minLength={6}
+                    />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <Button type="submit" className="w-full glow-indigo h-11 text-base" size="lg">
+                  Continue <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
 
-              <Button type="submit" className="w-full glow-indigo" size="lg" disabled={loading}>
-                {loading ? "Creating account..." : "Create Account"} <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
-              <p className="text-xs text-center text-muted-foreground">
-                All fields are optional. You can update these later in your profile.
-              </p>
-            </form>
-          )}
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border/50" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3">
+                  <Button type="button" variant="outline" onClick={handleGoogleLogin} disabled={loading} className="w-full">
+                    <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
+                      <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
+                    </svg>
+                    Google
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {/* SIGNUP STEP 2 — Patient Details */}
+            {mode === "signup" && step === 2 && (
+              <form key="signup-step-2" onSubmit={handleSignupStep2} className="space-y-5 animate-fade-in-up">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="h-1 flex-1 bg-primary/30 rounded-full"></div>
+                  <div className="h-1 flex-1 bg-primary rounded-full"></div>
+                </div>
+                <div className="flex items-center gap-2 mb-1">
+                  <button type="button" onClick={() => setStep(1)} className="text-muted-foreground hover:text-foreground transition-colors p-1 -ml-1">
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <p className="text-xs text-muted-foreground font-display uppercase tracking-wider">Patient Details</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5 group">
+                    <Label className="text-xs font-display text-muted-foreground group-focus-within:text-primary">Date of Birth</Label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                      <Input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} className="pl-9 bg-secondary/20 border-border/40 focus:bg-background transition-all text-sm" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5 group">
+                    <Label className="text-xs font-display text-muted-foreground group-focus-within:text-primary">Gender</Label>
+                    <select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full h-10 rounded-md bg-secondary/20 border border-border/40 px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all focus:bg-background">
+                      <option value="">Select</option>
+                      {GENDERS.map((g) => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5 group">
+                    <Label className="text-xs font-display flex items-center gap-1 text-muted-foreground group-focus-within:text-primary"><Droplets className="w-3 h-3" /> Blood Group</Label>
+                    <select value={bloodGroup} onChange={(e) => setBloodGroup(e.target.value)} className="w-full h-10 rounded-md bg-secondary/20 border border-border/40 px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all focus:bg-background">
+                      <option value="">Select</option>
+                      {BLOOD_GROUPS.map((bg) => <option key={bg} value={bg}>{bg}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5 group">
+                    <Label className="text-xs font-display flex items-center gap-1 text-muted-foreground group-focus-within:text-primary"><Phone className="w-3 h-3" /> Phone</Label>
+                    <Input type="tel" placeholder="+1 (555)..." value={phone} onChange={(e) => setPhone(e.target.value)} className="bg-secondary/20 border-border/40 focus:bg-background transition-all text-sm" />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 group">
+                  <Label className="text-xs font-display flex items-center gap-1 text-muted-foreground group-focus-within:text-primary"><AlertTriangle className="w-3 h-3" /> Emergency Contact</Label>
+                  <Input placeholder="Name & phone number" value={emergencyContact} onChange={(e) => setEmergencyContact(e.target.value)} className="bg-secondary/20 border-border/40 focus:bg-background transition-all text-sm" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5 group">
+                    <Label className="text-xs font-display flex items-center gap-1 text-muted-foreground group-focus-within:text-primary"><Heart className="w-3 h-3" /> Conditions</Label>
+                    <textarea placeholder="e.g. Diabetes..." value={medicalConditions} onChange={(e) => setMedicalConditions(e.target.value)} className="w-full min-h-[50px] rounded-md bg-secondary/20 border border-border/40 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none focus:bg-background transition-all" />
+                  </div>
+                  <div className="space-y-1.5 group">
+                    <Label className="text-xs font-display flex items-center gap-1 text-muted-foreground group-focus-within:text-primary">Allergies</Label>
+                    <textarea placeholder="e.g. Peanuts..." value={allergies} onChange={(e) => setAllergies(e.target.value)} className="w-full min-h-[50px] rounded-md bg-secondary/20 border border-border/40 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none focus:bg-background transition-all" />
+                  </div>
+                </div>
+
+                <Button type="submit" className="w-full glow-indigo h-11 text-base" size="lg" disabled={loading}>
+                  {loading ? "Creating account..." : "Create Account"} <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
+                <p className="text-[10px] text-center text-muted-foreground opacity-70">
+                  By clicking Create Account, you agree to our Terms of Service and Privacy Policy.
+                </p>
+              </form>
+            )}
+          </div>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          <Link to="/" className="hover:text-foreground transition-colors">← Back to home</Link>
+        <p className="text-center text-xs text-muted-foreground mt-8">
+          <Link to="/" className="hover:text-primary transition-colors flex items-center justify-center gap-1">
+            <ChevronLeft className="w-3 h-3" /> Back to home
+          </Link>
         </p>
       </div>
     </div>

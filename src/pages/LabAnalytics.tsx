@@ -1,14 +1,17 @@
+import { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { collection, query, orderBy, onSnapshot, limit } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
+import { useFamily } from "@/contexts/FamilyContext";
 
-const labResults = [
-  { name: "Blood Glucose", current: "95 mg/dL", previous: "110 mg/dL", trend: "improved", unit: "mg/dL" },
-  { name: "HbA1c", current: "6.2%", previous: "6.8%", trend: "improved", unit: "%" },
-  { name: "Cholesterol", current: "205 mg/dL", previous: "198 mg/dL", trend: "degraded", unit: "mg/dL" },
-  { name: "Creatinine", current: "1.1 mg/dL", previous: "1.0 mg/dL", trend: "watch", unit: "mg/dL" },
-  { name: "Hemoglobin", current: "14.2 g/dL", previous: "14.0 g/dL", trend: "stable", unit: "g/dL" },
-  { name: "TSH", current: "2.5 mIU/L", previous: "2.4 mIU/L", trend: "stable", unit: "mIU/L" },
-];
+interface LabResult {
+  name: string;
+  current: string;
+  previous: string;
+  trend: "improved" | "degraded" | "stable" | "watch";
+  unit: string;
+}
 
 const timelineData = [
   { month: "Jul", glucose: 115, hba1c: 7.1, cholesterol: 210 },
@@ -34,6 +37,75 @@ const insights = [
 ];
 
 export default function LabAnalytics() {
+  const [results, setResults] = useState<LabResult[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { activeMember } = useFamily();
+
+  useEffect(() => {
+    if (!auth.currentUser || !activeMember) return;
+
+    let collectionPath = "";
+    if (activeMember.isPrimary) {
+      collectionPath = `users/${auth.currentUser.uid}/lab_reports`;
+    } else {
+      collectionPath = `users/${auth.currentUser.uid}/family_members/${activeMember.id}/lab_reports`;
+    }
+
+    const q = query(collection(db, collectionPath), orderBy("date", "desc"), limit(10));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const reports = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      if (reports.length === 0) {
+        setResults([]);
+        setLoading(false);
+        return;
+      }
+
+      // Heuristic trend analysis
+      // In a real app, we'd iterate over all unique test names found in reports
+      // For demo, let's process the most common ones
+      const testNames = ["Glucose", "HbA1c", "Cholesterol", "Creatinine", "Hemoglobin", "TSH"];
+      const dynamicResults: LabResult[] = [];
+
+      testNames.forEach(name => {
+        const matchingTests = reports
+          .map((r: any) => r.tests?.find((t: any) => t.name.includes(name)))
+          .filter(Boolean);
+
+        if (matchingTests.length > 0) {
+          const current = matchingTests[0];
+          const previous = matchingTests[1];
+
+          let trend: any = "stable";
+          if (previous) {
+            const cVal = parseFloat(current.value);
+            const pVal = parseFloat(previous.value);
+
+            // Logic varies by test type (e.g. higher glucose is bad, higher hemoglobin might be good)
+            if (name === "Glucose" || name === "HbA1c" || name === "Cholesterol") {
+              trend = cVal < pVal ? "improved" : (cVal > pVal ? "degraded" : "stable");
+            } else {
+              trend = cVal > pVal ? "improved" : (cVal < pVal ? "degraded" : "stable");
+            }
+          }
+
+          dynamicResults.push({
+            name: current.name,
+            current: `${current.value} ${current.unit}`,
+            previous: previous ? `${previous.value} ${previous.unit}` : "N/A",
+            trend: trend,
+            unit: current.unit
+          });
+        }
+      });
+
+      setResults(dynamicResults);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [activeMember]);
   return (
     <div className="space-y-6 animate-fade-in-up">
       <div>
@@ -74,22 +146,31 @@ export default function LabAnalytics() {
 
       {/* Results Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        {labResults.map((result) => {
-          const t = trendConfig[result.trend as keyof typeof trendConfig];
-          const TrendIcon = t.icon;
-          return (
-            <div key={result.name} className="glass-card p-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-muted-foreground">{result.name}</p>
-                <div className={`w-6 h-6 rounded-md ${t.bg} flex items-center justify-center`}>
-                  <TrendIcon className={`w-3.5 h-3.5 ${t.color}`} />
+        {loading ? (
+          <div className="col-span-full py-12 text-center text-muted-foreground italic">Updating analytics engine...</div>
+        ) : results.length > 0 ? (
+          results.map((result) => {
+            const t = trendConfig[result.trend as keyof typeof trendConfig] || trendConfig.stable;
+            const TrendIcon = t.icon;
+            return (
+              <div key={result.name} className="glass-card p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-muted-foreground">{result.name}</p>
+                  <div className={`w-6 h-6 rounded-md ${t.bg} flex items-center justify-center`}>
+                    <TrendIcon className={`w-3.5 h-3.5 ${t.color}`} />
+                  </div>
                 </div>
+                <p className="text-xl font-display font-bold text-foreground">{result.current}</p>
+                <p className="text-xs text-muted-foreground mt-1">Previous: {result.previous}</p>
               </div>
-              <p className="text-xl font-display font-bold text-foreground">{result.current}</p>
-              <p className="text-xs text-muted-foreground mt-1">Previous: {result.previous}</p>
-            </div>
-          );
-        })}
+            );
+          })
+        ) : (
+          <div className="col-span-full py-12 glass-card text-center">
+            <p className="text-sm text-muted-foreground">No historical lab data found to compare.</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Trends will appear after your second report upload.</p>
+          </div>
+        )}
       </div>
 
       {/* AI Insights */}

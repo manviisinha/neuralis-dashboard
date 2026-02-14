@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, Link } from "react-router-dom";
 import {
   LayoutDashboard,
   ScanLine,
@@ -42,7 +42,11 @@ export function NeuralSidebar({ collapsed, onToggle }: Props) {
       )}
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 h-16 border-b border-border/30">
+      <Link
+        to="/"
+        state={{ fromDashboard: true }}
+        className="flex items-center gap-3 px-4 h-16 border-b border-border/30 hover:bg-white/5 transition-colors"
+      >
         <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center glow-indigo">
           <Brain className="w-5 h-5 text-primary" />
         </div>
@@ -51,7 +55,7 @@ export function NeuralSidebar({ collapsed, onToggle }: Props) {
             Neurora
           </span>
         )}
-      </div>
+      </Link>
 
       {/* Nav */}
       <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">

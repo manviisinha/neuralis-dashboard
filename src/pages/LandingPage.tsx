@@ -1,7 +1,10 @@
-import { Link } from "react-router-dom";
-import { Brain, ShieldCheck, ScanLine, FlaskConical, MapPin, Users, Zap, ArrowRight, CheckCircle2, Star, Crown } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { Brain, ShieldCheck, ScanLine, FlaskConical, MapPin, Users, Zap, ArrowRight, CheckCircle2, Star, Crown, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { MoleculeVisualization } from "@/components/MoleculeVisualization";
+import { HeroVisualization } from "@/components/HeroVisualization";
+import { auth } from "@/lib/firebase";
+import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
 
 const features = [
   {
@@ -63,7 +66,21 @@ const testimonials = [
   { name: "Dr. Priya Patel", role: "Pharmacist", quote: "The prescription parsing accuracy is remarkable. It saves us hours every week.", rating: 5 },
 ];
 
+import { useFamily } from "@/contexts/FamilyContext";
+
 export default function LandingPage() {
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const location = useLocation();
+  const showProfile = user && location.state?.fromDashboard;
+  const { activeMember } = useFamily(); // Use same source of truth as Dashboard
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
+
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       {/* Nav */}
@@ -81,12 +98,30 @@ export default function LandingPage() {
             <a href="#testimonials" className="hover:text-foreground transition-colors">Testimonials</a>
           </nav>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/auth">Log In</Link>
-            </Button>
-            <Button size="sm" className="glow-indigo" asChild>
-              <Link to="/auth">Get Started</Link>
-            </Button>
+            {showProfile ? (
+              <Button variant="ghost" size="icon" asChild className="relative overflow-hidden group rounded-full">
+                <Link to="/dashboard">
+                  <div
+                    className="w-9 h-9 rounded-full border-2 border-background flex items-center justify-center relative hover:ring-2 ring-primary/20 transition-all"
+                    style={{ backgroundColor: activeMember?.accentColor || "hsla(var(--primary) / 0.2)" }}
+                  >
+                    <span className="text-sm font-display font-bold text-white">{activeMember?.avatar || "??"}</span>
+                    <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-neurora-gold flex items-center justify-center">
+                      <Crown className="w-2.5 h-2.5 text-white" />
+                    </div>
+                  </div>
+                </Link>
+              </Button>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/auth">Log In</Link>
+                </Button>
+                <Button size="sm" className="glow-indigo" asChild>
+                  <Link to="/auth?mode=signup">Get Started</Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -110,13 +145,21 @@ export default function LandingPage() {
               Neurora transforms complex medical data into clear, actionable insights. From prescription parsing to drug conflict detection — powered by advanced AI.
             </p>
             <div className="flex flex-wrap gap-4">
-              <Button size="lg" className="glow-indigo text-base px-8" asChild>
-                <Link to="/dashboard">
-                  Open Dashboard <ArrowRight className="w-4 h-4 ml-1" />
-                </Link>
-              </Button>
+              {user ? (
+                <Button size="lg" className="glow-indigo text-base px-8" asChild>
+                  <Link to="/dashboard">
+                    Go to Dashboard <ArrowRight className="w-4 h-4 ml-1" />
+                  </Link>
+                </Button>
+              ) : (
+                <Button size="lg" className="glow-indigo text-base px-8" asChild>
+                  <Link to="/auth?mode=signup">
+                    Get Started <ArrowRight className="w-4 h-4 ml-1" />
+                  </Link>
+                </Button>
+              )}
               <Button variant="outline" size="lg" className="text-base px-8" asChild>
-                <Link to="/subscription">View Plans</Link>
+                <a href="#pricing">View Plans</a>
               </Button>
             </div>
             <div className="flex items-center gap-6 pt-2 text-sm text-muted-foreground">
@@ -125,18 +168,10 @@ export default function LandingPage() {
               <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-neurora-mint" /> HIPAA Ready</span>
             </div>
           </div>
-          <div className="flex justify-center animate-fade-in-up" style={{ animationDelay: "0.15s" }}>
-            <div className="glass-card p-8 w-full max-w-md">
-              <MoleculeVisualization />
-              <div className="mt-6 p-4 rounded-lg bg-secondary/30 border border-border/20">
-                <p className="text-base font-body leading-relaxed">
-                  <span className="font-semibold text-primary">Metformin 500mg</span> — Helps lower blood sugar by improving insulin sensitivity. Take with meals.
-                </p>
-                <div className="flex items-center gap-2 mt-3 text-xs text-neurora-mint font-display font-semibold">
-                  <ShieldCheck className="w-3.5 h-3.5" /> No conflicts detected
-                </div>
-              </div>
-            </div>
+
+
+          <div className="flex justify-center items-center animate-fade-in-up" style={{ animationDelay: "0.15s" }}>
+            <HeroVisualization />
           </div>
         </div>
       </section>
@@ -155,57 +190,55 @@ export default function LandingPage() {
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {features.map((f) => (
-              <div key={f.title} className={`glass-card p-6 group hover:border-primary/30 transition-colors relative ${f.premium ? "border-neurora-gold/20" : ""}`}>
-                {f.premium && (
-                  <span className="absolute top-4 right-4 text-[10px] uppercase tracking-wider font-display font-semibold text-neurora-gold flex items-center gap-1">
-                    <Crown className="w-3 h-3" /> Plus
-                  </span>
-                )}
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-4 ${f.premium ? "bg-neurora-gold/10" : "bg-primary/10"}`}>
-                  <f.icon className={`w-5 h-5 ${f.premium ? "text-neurora-gold" : "text-primary"}`} />
+              <div key={f.title} className="glass-card p-6 hover:border-primary/30 transition-colors group">
+                <div className="w-12 h-12 rounded-lg bg-secondary/50 flex items-center justify-center mb-4 group-hover:bg-primary/10 transition-colors">
+                  <f.icon className="w-6 h-6 text-primary" />
                 </div>
-                <h3 className="font-display font-semibold text-lg mb-2">{f.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+                <h3 className="text-xl font-display font-bold mb-2 flex items-center gap-2">
+                  {f.title}
+                  {f.premium && <Crown className="w-3.5 h-3.5 text-neurora-gold" />}
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {f.desc}
+                </p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="py-20 px-6">
-        <div className="max-w-4xl mx-auto">
+      {/* Tiers */}
+      <section id="pricing" className="py-20 px-6 bg-secondary/20">
+        <div className="max-w-7xl mx-auto">
           <div className="text-center mb-14">
             <h2 className="text-3xl lg:text-4xl font-display font-bold">
-              Simple, <span className="text-gradient-gold">Transparent</span> Pricing
+              Simple, Transparent{" "}
+              <span className="text-gradient-indigo">Pricing</span>
             </h2>
-            <p className="mt-4 text-muted-foreground">Start free. Upgrade when you need more.</p>
           </div>
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {tiers.map((tier) => (
-              <div key={tier.name} className={`rounded-xl p-8 flex flex-col ${tier.highlight ? "glass-card-premium glow-gold" : "glass-card"}`}>
-                <div className="mb-6">
-                  {tier.highlight && (
-                    <span className="text-[10px] uppercase tracking-wider font-display font-semibold text-neurora-gold flex items-center gap-1 mb-3">
-                      <Crown className="w-3 h-3" /> Most Popular
-                    </span>
-                  )}
-                  <h3 className={`text-xl font-display font-bold ${tier.highlight ? "text-neurora-gold" : ""}`}>{tier.name}</h3>
-                  <div className="mt-2">
-                    <span className="text-4xl font-display font-bold">{tier.price}</span>
-                    {tier.period && <span className="text-muted-foreground text-sm">{tier.period}</span>}
+              <div key={tier.name} className={`glass-card p-8 flex flex-col relative ${tier.highlight ? 'border-primary/40 shadow-lg shadow-primary/5' : ''}`}>
+                {tier.highlight && (
+                  <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/4 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                    Most Popular
                   </div>
+                )}
+                <h3 className="text-xl font-display font-bold mb-2">{tier.name}</h3>
+                <div className="flex items-baseline gap-1 mb-6">
+                  <span className="text-4xl font-bold">{tier.price}</span>
+                  <span className="text-muted-foreground">{tier.period}</span>
                 </div>
-                <ul className="space-y-3 flex-1 mb-8">
+                <ul className="space-y-3 mb-8 flex-1">
                   {tier.features.map((feat) => (
-                    <li key={feat} className="flex items-start gap-2 text-sm">
-                      <CheckCircle2 className={`w-4 h-4 mt-0.5 shrink-0 ${tier.highlight ? "text-neurora-gold" : "text-neurora-mint"}`} />
-                      <span className="text-muted-foreground">{feat}</span>
+                    <li key={feat} className="flex items-start gap-2 text-sm text-muted-foreground">
+                      <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                      {feat}
                     </li>
                   ))}
                 </ul>
-                <Button className={`w-full ${tier.highlight ? "bg-neurora-gold hover:bg-neurora-gold/90 text-background glow-gold" : ""}`} size="lg" asChild>
-                  <Link to={tier.highlight ? "/subscription" : "/dashboard"}>{tier.cta}</Link>
+                <Button variant={tier.highlight ? "default" : "outline"} className={tier.highlight ? "glow-indigo" : ""} asChild>
+                  <Link to="/auth?mode=signup">{tier.cta}</Link>
                 </Button>
               </div>
             ))}
@@ -215,22 +248,24 @@ export default function LandingPage() {
 
       {/* Testimonials */}
       <section id="testimonials" className="py-20 px-6">
-        <div className="max-w-5xl mx-auto">
-          <h2 className="text-3xl lg:text-4xl font-display font-bold text-center mb-14">
-            Trusted by <span className="text-gradient-indigo">Professionals</span>
-          </h2>
-          <div className="grid md:grid-cols-3 gap-5">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl lg:text-4xl font-display font-bold">
+              Trusted by Professionals
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
             {testimonials.map((t) => (
               <div key={t.name} className="glass-card p-6">
-                <div className="flex gap-0.5 mb-4">
-                  {Array.from({ length: t.rating }).map((_, i) => (
+                <div className="flex gap-1 mb-4">
+                  {[...Array(t.rating)].map((_, i) => (
                     <Star key={i} className="w-4 h-4 fill-neurora-gold text-neurora-gold" />
                   ))}
                 </div>
-                <p className="text-sm text-muted-foreground leading-relaxed mb-4">"{t.quote}"</p>
+                <p className="text-sm text-muted-foreground italic mb-4">"{t.quote}"</p>
                 <div>
-                  <p className="font-display font-semibold text-sm">{t.name}</p>
-                  <p className="text-xs text-muted-foreground">{t.role}</p>
+                  <p className="font-bold text-sm">{t.name}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">{t.role}</p>
                 </div>
               </div>
             ))}
@@ -239,13 +274,15 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border/20 py-10 px-6">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <footer className="py-12 px-6 border-t border-border/20 bg-background">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2">
-            <Brain className="w-5 h-5 text-primary" />
-            <span className="font-display font-bold text-gradient-indigo">Neurora</span>
+            <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center">
+              <Brain className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <span className="font-display font-bold text-muted-foreground">Neurora</span>
           </div>
-          <p className="text-xs text-muted-foreground">© 2026 Neurora. AI-powered health intelligence.</p>
+          <p className="text-sm text-muted-foreground">© 2024 Neurora Health AI. All rights reserved.</p>
         </div>
       </footer>
     </div>

@@ -75,7 +75,12 @@
     font-family: var(--font-body);
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-display);
   }
 }
@@ -86,7 +91,7 @@
     background: hsl(var(--neurora-glass) / 0.6);
     backdrop-filter: blur(20px);
     box-shadow: 0 8px 32px hsl(var(--neurora-indigo) / 0.08),
-                0 2px 8px hsl(0 0% 0% / 0.3);
+      0 2px 8px hsl(0 0% 0% / 0.3);
   }
 
   .glass-sidebar {
@@ -97,7 +102,7 @@
 
   .glow-indigo {
     box-shadow: 0 0 20px hsl(var(--neurora-indigo) / 0.4),
-                0 0 40px hsl(var(--neurora-indigo) / 0.15);
+      0 0 40px hsl(var(--neurora-indigo) / 0.15);
   }
 
   .glow-mint {
@@ -128,12 +133,12 @@
 
   .glow-gold {
     box-shadow: 0 0 20px hsl(var(--neurora-gold) / 0.35),
-                0 0 40px hsl(var(--neurora-gold) / 0.12);
+      0 0 40px hsl(var(--neurora-gold) / 0.12);
   }
 
   .glow-amethyst {
     box-shadow: 0 0 20px hsl(var(--neurora-amethyst) / 0.35),
-                0 0 40px hsl(var(--neurora-amethyst) / 0.12);
+      0 0 40px hsl(var(--neurora-amethyst) / 0.12);
   }
 
   .glass-card-premium {
@@ -142,39 +147,77 @@
     backdrop-filter: blur(20px);
     border: 1px solid hsl(var(--neurora-gold) / 0.25);
     box-shadow: 0 8px 32px hsl(var(--neurora-gold) / 0.08),
-                0 2px 8px hsl(0 0% 0% / 0.3);
+      0 2px 8px hsl(0 0% 0% / 0.3);
   }
 }
 
 @layer utilities {
   @keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 8px hsl(var(--neurora-danger) / 0.4); }
-    50% { box-shadow: 0 0 24px hsl(var(--neurora-danger) / 0.7), 0 0 48px hsl(var(--neurora-danger) / 0.3); }
+
+    0%,
+    100% {
+      box-shadow: 0 0 8px hsl(var(--neurora-danger) / 0.4);
+    }
+
+    50% {
+      box-shadow: 0 0 24px hsl(var(--neurora-danger) / 0.7), 0 0 48px hsl(var(--neurora-danger) / 0.3);
+    }
   }
 
   @keyframes neural-wave {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
+    0% {
+      transform: translateX(-100%);
+    }
+
+    100% {
+      transform: translateX(100%);
+    }
   }
 
   @keyframes brain-pulse {
-    0%, 100% { transform: scale(1); opacity: 0.7; }
-    50% { transform: scale(1.15); opacity: 1; }
+
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 0.7;
+    }
+
+    50% {
+      transform: scale(1.15);
+      opacity: 1;
+    }
   }
 
   @keyframes laser-scan {
-    0% { top: 0; }
-    100% { top: 100%; }
+    0% {
+      top: 0;
+    }
+
+    100% {
+      top: 100%;
+    }
   }
 
   @keyframes fade-in-up {
-    0% { opacity: 0; transform: translateY(16px); }
-    100% { opacity: 1; transform: translateY(0); }
+    0% {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
+    0% {
+      background-position: -200% 0;
+    }
+
+    100% {
+      background-position: 200% 0;
+    }
   }
 
   .animate-pulse-glow {
@@ -200,5 +243,9 @@
   .animate-shimmer {
     background-size: 200% 100%;
     animation: shimmer 2s linear infinite;
+  }
+
+  .perspective-1000 {
+    perspective: 1000px;
   }
 }
