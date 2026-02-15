@@ -79,5 +79,4 @@ python main.py
 - **Strict Access Control**: Users must sign up and verify email to access the dashboard.
 - **Data Privacy**: All medical data is stored securely in Firestore with user-scoped permissions.
 
----
-*Built with ❤️ by the Neuralis Team*
+---Made By : Manvi Sinha
