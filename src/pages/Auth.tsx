@@ -75,22 +75,33 @@ export default function Auth() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      // Check if user profile exists, if not create one
+      // Check if user profile exists
       const docRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(docRef);
 
-      if (!docSnap.exists()) {
-        await setDoc(docRef, {
-          uid: user.uid,
-          email: user.email,
-          full_name: user.displayName,
-          photo_url: user.photoURL,
-          created_at: new Date().toISOString()
-        });
+      if (mode === "login") {
+        if (docSnap.exists()) {
+          toast({ title: "Welcome back!", description: `Successfully logged in as ${user.displayName || user.email}` });
+          navigate("/dashboard");
+        } else {
+          // Account doesn't exist, but we are in login mode -> BLOCK
+          await auth.signOut();
+          toast({ title: "Account not found", description: "Please sign up first to create an account.", variant: "destructive" });
+        }
+      } else {
+        // Signup Mode
+        if (docSnap.exists()) {
+          // Already exists, just log in
+          toast({ title: "Account exists", description: "Logging you in..." });
+          navigate("/dashboard");
+        } else {
+          // New user -> Move to Step 2 to collect details
+          setFullName(user.displayName || "");
+          setEmail(user.email || "");
+          setStep(2);
+          toast({ title: "Google Account Verified", description: "Please complete your patient details." });
+        }
       }
-
-      toast({ title: "Welcome back!", description: `Successfully logged in as ${user.displayName || user.email}` });
-      navigate("/dashboard");
     } catch (error: unknown) {
       const err = error as any;
       console.error("Google Login Error:", error);
@@ -137,11 +148,18 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      let user;
 
-      // Send verification email
-      await sendEmailVerification(user);
+      if (auth.currentUser) {
+        // Case: User already authenticated via Google Search
+        user = auth.currentUser;
+      } else {
+        // Case: Standard Email/Password Signup
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        user = userCredential.user;
+        // Send verification email
+        await sendEmailVerification(user);
+      }
 
       // Save user profile to Firestore
       await setDoc(doc(db, "users", user.uid), {
@@ -156,15 +174,19 @@ export default function Auth() {
         medical_conditions: medicalConditions || null,
         allergies: allergies || null,
         created_at: new Date().toISOString()
-      });
+      }, { merge: true });
 
       toast({
         title: "Account created!",
-        description: "Please check your email to verify your account before logging in.",
+        description: auth.currentUser ? "Welcome to Neuralis!" : "Please check your email to verify your account before logging in.",
       });
 
-      setMode("login");
-      setStep(1);
+      if (auth.currentUser) {
+        navigate("/dashboard");
+      } else {
+        setMode("login");
+        setStep(1);
+      }
     } catch (error: unknown) {
       const err = error as any;
       console.error(error);
