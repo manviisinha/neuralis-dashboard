@@ -100,7 +100,7 @@ export function TopHeader({ onToggleSidebar }: Props) {
         {/* User Profile Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="outline-none">
+            <button className="outline-none flex items-center gap-2 hover:bg-secondary/50 p-1.5 rounded-full transition-colors">
               <div
                 className="w-9 h-9 rounded-full border-2 border-background flex items-center justify-center relative hover:ring-2 ring-primary/20 transition-all"
                 style={{ backgroundColor: activeMember?.accentColor || "hsla(var(--primary) / 0.2)" }}
@@ -109,6 +109,10 @@ export function TopHeader({ onToggleSidebar }: Props) {
                 <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-neurora-gold flex items-center justify-center">
                   <Crown className="w-2.5 h-2.5 text-white" />
                 </div>
+              </div>
+              <div className="hidden md:block text-left mr-1">
+                <p className="text-xs font-bold font-display leading-tight">{activeMember?.name}</p>
+                <p className="text-[10px] text-muted-foreground">Premium User</p>
               </div>
             </button>
           </DropdownMenuTrigger>

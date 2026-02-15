@@ -66,7 +66,15 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       const userRef = doc(db, "users", user.uid);
       const unsubscribeUser = onSnapshot(userRef, (docSnap) => {
         const userData = docSnap.data();
-        const primaryName = userData?.full_name || "Myself";
+        let primaryName = userData?.full_name;
+
+        if (!primaryName) {
+          primaryName = user.displayName;
+        }
+        if (!primaryName && user.email) {
+          primaryName = user.email.split("@")[0];
+        }
+        primaryName = primaryName || "User";
 
         const newPrimary: FamilyMember = {
           id: "primary",
