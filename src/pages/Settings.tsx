@@ -11,9 +11,20 @@ import { Separator } from "@/components/ui/separator";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
+interface SettingsData {
+    full_name?: string;
+    phone?: string;
+    date_of_birth?: string;
+    blood_group?: string;
+    emergency_contact?: string;
+    medical_conditions?: string;
+    allergies?: string;
+    [key: string]: any;
+}
+
 export default function Settings() {
     const [loading, setLoading] = useState(true);
-    const [formData, setFormData] = useState<any>({});
+    const [formData, setFormData] = useState<SettingsData>({});
     const { toast } = useToast();
 
     useEffect(() => {
@@ -23,7 +34,7 @@ export default function Settings() {
                     const docRef = doc(db, "users", user.uid);
                     const docSnap = await getDoc(docRef);
                     if (docSnap.exists()) {
-                        setFormData(docSnap.data());
+                        setFormData(docSnap.data() as SettingsData);
                     }
                 } catch (error) {
                     console.error("Error fetching user data:", error);
@@ -35,18 +46,19 @@ export default function Settings() {
     }, []);
 
     const handleInputChange = (field: string, value: string) => {
-        setFormData((prev: any) => ({ ...prev, [field]: value }));
+        setFormData((prev) => ({ ...prev, [field]: value }));
     };
 
     const handleSaveProfile = async () => {
         if (!auth.currentUser) return;
         try {
             const docRef = doc(db, "users", auth.currentUser.uid);
-            await updateDoc(docRef, formData);
+            await updateDoc(docRef, formData as any);
             toast({ title: "Settings Saved", description: "Your profile details have been updated." });
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const err = error as any;
             console.error("Error updating profile:", error);
-            toast({ title: "Update Failed", description: error.message, variant: "destructive" });
+            toast({ title: "Update Failed", description: err.message, variant: "destructive" });
         }
     };
 

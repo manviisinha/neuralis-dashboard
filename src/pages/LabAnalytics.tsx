@@ -38,6 +38,7 @@ const insights = [
 
 export default function LabAnalytics() {
   const [results, setResults] = useState<LabResult[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { activeMember } = useFamily();
 
@@ -51,47 +52,112 @@ export default function LabAnalytics() {
       collectionPath = `users/${auth.currentUser.uid}/family_members/${activeMember.id}/lab_reports`;
     }
 
-    const q = query(collection(db, collectionPath), orderBy("date", "desc"), limit(10));
+    const q = query(collection(db, collectionPath), orderBy("date", "asc"));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const reports = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      interface LabReport {
+        id: string;
+        date: any;
+        tests?: { name: string; value: string; unit: string }[];
+        [key: string]: any;
+      }
+      const reports = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as LabReport[];
 
       if (reports.length === 0) {
         setResults([]);
+        setChartData([]);
         setLoading(false);
         return;
       }
 
-      // Heuristic trend analysis
-      // In a real app, we'd iterate over all unique test names found in reports
-      // For demo, let's process the most common ones
-      const testNames = ["Glucose", "HbA1c", "Cholesterol", "Creatinine", "Hemoglobin", "TSH"];
+      // 1. Process Timeline Chart Data (Chronological)
+      const dynamicChartData = reports.map(r => {
+        const date = r.date?.toDate ? r.date.toDate() : new Date();
+        const month = date.toLocaleString('default', { month: 'short' });
+        const entry: any = { month, fullDate: date.toLocaleDateString() };
+
+        r.tests?.forEach(t => {
+          if (!t.value) return;
+          const val = parseFloat(t.value.replace(/[^0-9.]/g, ''));
+          if (!isNaN(val)) {
+            const lowerName = t.name.toLowerCase();
+            if (lowerName.includes("glucose")) {
+              entry["glucose"] = val;
+            } else if (lowerName.includes("cholesterol")) {
+              entry["cholesterol"] = val;
+            } else {
+              entry[lowerName] = val;
+            }
+          }
+        });
+        return entry;
+      });
+      setChartData(dynamicChartData);
+
+      // 2. Process Current Results & Trends (Compare newest vs second newest)
+      // Helper to normalize test names for grouping
+      const normalizeName = (name: string) => {
+        const n = name.toLowerCase();
+        if (n.includes("glucose") || n.includes("sugar")) return "Glucose";
+        if (n.includes("hba1c") || n.includes("a1c")) return "HbA1c";
+        if (n.includes("cholesterol")) return "Cholesterol";
+        if (n.includes("creatinine")) return "Creatinine";
+        if (n.includes("hemoglobin") && !n.includes("a1c")) return "Hemoglobin";
+        if (n.includes("tsh") || n.includes("thyroid")) return "TSH";
+        return name; // Fallback
+      };
+
+      // Group all tests by normalized name
+      const grouped = new Map<string, { value: string; unit: string; date: any }[]>();
+
+      reports.forEach(r => {
+        r.tests?.forEach(t => {
+          if (!t.value) return;
+          const key = normalizeName(t.name);
+          if (!grouped.has(key)) {
+            grouped.set(key, []);
+          }
+          grouped.get(key)?.push({
+            value: t.value,
+            unit: t.unit,
+            date: r.date
+          });
+        });
+      });
+
       const dynamicResults: LabResult[] = [];
 
-      testNames.forEach(name => {
-        const matchingTests = reports
-          .map((r: any) => r.tests?.find((t: any) => t.name.includes(name)))
-          .filter(Boolean);
+      grouped.forEach((groupDocs, key) => {
+        // Sort by date descending (Newest first)
+        groupDocs.sort((a, b) => {
+          const dA = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
+          const dB = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
+          return dB.getTime() - dA.getTime();
+        });
 
-        if (matchingTests.length > 0) {
-          const current = matchingTests[0];
-          const previous = matchingTests[1];
+        if (groupDocs.length > 0) {
+          const current = groupDocs[0];
+          const previous = groupDocs[1]; // might be undefined
 
-          let trend: any = "stable";
+          let trend: LabResult["trend"] = "stable";
           if (previous) {
-            const cVal = parseFloat(current.value);
-            const pVal = parseFloat(previous.value);
+            const cVal = parseFloat(current.value.replace(/[^0-9.]/g, ''));
+            const pVal = parseFloat(previous.value.replace(/[^0-9.]/g, ''));
+            const isLowerBetter = ["Glucose", "HbA1c", "Cholesterol", "Creatinine", "TSH"].includes(key);
 
-            // Logic varies by test type (e.g. higher glucose is bad, higher hemoglobin might be good)
-            if (name === "Glucose" || name === "HbA1c" || name === "Cholesterol") {
-              trend = cVal < pVal ? "improved" : (cVal > pVal ? "degraded" : "stable");
-            } else {
-              trend = cVal > pVal ? "improved" : (cVal < pVal ? "degraded" : "stable");
+            if (!isNaN(cVal) && !isNaN(pVal)) {
+              if (cVal === pVal) trend = "stable";
+              else if (isLowerBetter) {
+                trend = cVal < pVal ? "improved" : "degraded";
+              } else {
+                // Higher is better (e.g. Hemoglobin sometimes? usually depends, but let's assume standard logic)
+                trend = cVal > pVal ? "improved" : "degraded";
+              }
             }
           }
 
           dynamicResults.push({
-            name: current.name,
+            name: key, // Use the normalized name as display
             current: `${current.value} ${current.unit}`,
             previous: previous ? `${previous.value} ${previous.unit}` : "N/A",
             trend: trend,
@@ -100,12 +166,16 @@ export default function LabAnalytics() {
         }
       });
 
+      // Sort results to put common tests first if desired, or just alphabetically
+      // dynamicResults.sort((a, b) => a.name.localeCompare(b.name));
+
       setResults(dynamicResults);
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, [activeMember]);
+
   return (
     <div className="space-y-6 animate-fade-in-up">
       <div>
@@ -113,34 +183,31 @@ export default function LabAnalytics() {
         <p className="text-sm text-muted-foreground mt-1">Track your lab results over time</p>
       </div>
 
-      {/* Timeline Chart */}
+      {/* Wellness Snapshot */}
       <div className="glass-card p-5">
-        <h2 className="text-sm font-display font-semibold text-muted-foreground uppercase tracking-wider mb-4">Progress Horizon</h2>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={timelineData}>
-              <defs>
-                <linearGradient id="glucoseGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(157, 100%, 50%)" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="hsl(157, 100%, 50%)" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="cholGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(42, 100%, 50%)" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="hsl(42, 100%, 50%)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(240, 12%, 22%)" />
-              <XAxis dataKey="month" tick={{ fill: "hsl(220, 10%, 55%)", fontSize: 12 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "hsl(220, 10%, 55%)", fontSize: 12 }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ background: "hsl(240, 18%, 14%)", border: "1px solid hsl(240, 12%, 25%)", borderRadius: "8px", color: "hsl(220, 20%, 92%)", fontSize: 12 }} />
-              <Area type="monotone" dataKey="glucose" stroke="hsl(157, 100%, 50%)" strokeWidth={2} fill="url(#glucoseGrad)" />
-              <Area type="monotone" dataKey="cholesterol" stroke="hsl(42, 100%, 50%)" strokeWidth={2} fill="url(#cholGrad)" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="flex gap-4 mt-3 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-neurora-mint rounded" /> Glucose</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-neurora-amber rounded" /> Cholesterol</span>
+        <h2 className="text-sm font-display font-semibold text-muted-foreground uppercase tracking-wider mb-4">Wellness Snapshot</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-secondary/20 p-4 rounded-xl border border-border/20">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Latest Report</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold font-display">
+                {chartData.length > 0 ? chartData[chartData.length - 1].fullDate : "N/A"}
+              </span>
+            </div>
+          </div>
+          <div className="bg-secondary/20 p-4 rounded-xl border border-border/20">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Tests Tracked</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold font-display">{results.length}</span>
+              <span className="text-xs text-muted-foreground">biomarkers</span>
+            </div>
+          </div>
+          <div className="bg-secondary/20 p-4 rounded-xl border border-border/20">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Wellness Status</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold font-display text-neurora-mint">Active Monitoring</span>
+            </div>
+          </div>
         </div>
       </div>
 

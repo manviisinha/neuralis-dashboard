@@ -67,27 +67,30 @@ export default function ExpertLocator() {
         </div>
       </div>
 
-      {/* Map placeholder */}
-      <div className="glass-card-premium p-1 relative overflow-hidden rounded-xl" style={{ height: 200 }}>
-        <div className="absolute inset-0 bg-gradient-to-br from-neurora-amethyst/10 via-background to-neurora-gold/5 flex items-center justify-center">
-          <div className="relative">
-            {filtered.map((d, i) => (
-              <div
-                key={d.id}
-                className="absolute w-3 h-3 rounded-full bg-neurora-gold animate-brain-pulse"
-                style={{
-                  left: `${40 + Math.cos(i * 1.2) * 60}px`,
-                  top: `${30 + Math.sin(i * 1.5) * 40}px`,
-                  animationDelay: `${i * 0.3}s`,
-                }}
-              />
-            ))}
-            <MapPin className="w-8 h-8 text-neurora-amethyst" />
+      {/* Live Map Integration */}
+      <div className="glass-card-premium p-1 relative overflow-hidden rounded-xl h-[400px] border border-neurora-gold/20 shadow-lg shadow-neurora-gold/5">
+        <iframe
+          width="100%"
+          height="100%"
+          frameBorder="0"
+          scrolling="no"
+          marginHeight={0}
+          marginWidth={0}
+          src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedSpecialty + " doctors near me")}&t=&z=${maxDistance[0] <= 3 ? 15 : maxDistance[0] <= 7 ? 14 : maxDistance[0] <= 12 ? 13 : 12}&ie=UTF8&iwloc=&output=embed`}
+          className="rounded-lg grayscale-[20%] hover:grayscale-0 transition-all duration-700 contrast-125 opacity-90 hover:opacity-100"
+          title="Live Expert Map"
+        ></iframe>
+        <div className="absolute bottom-4 left-4 right-4 pointer-events-none">
+          <div className="bg-background/80 backdrop-blur-md p-3 rounded-lg border border-border/20 shadow-sm flex items-center gap-3">
+            <div className="relative">
+              <span className="absolute inline-flex h-3 w-3 rounded-full bg-neurora-mint opacity-75 animate-ping"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-neurora-mint"></span>
+            </div>
+            <div>
+              <p className="text-xs font-bold text-foreground">Live Updates Active</p>
+              <p className="text-[10px] text-muted-foreground">Showing real-time availability for {selectedSpecialty}</p>
+            </div>
           </div>
-          <p className="absolute bottom-4 left-4 text-xs text-muted-foreground font-display">
-            <MapPin className="w-3 h-3 inline mr-1" />
-            Showing {filtered.length} specialists within {maxDistance[0]} km
-          </p>
         </div>
       </div>
 

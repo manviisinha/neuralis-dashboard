@@ -51,9 +51,18 @@ export default function Auth() {
       await signInWithEmailAndPassword(auth, email, password);
       toast({ title: "Welcome back!", description: "Successfully logged in." });
       navigate("/dashboard");
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as any;
       console.error("Login Error:", error);
-      toast({ title: "Login failed", description: error.message, variant: "destructive" });
+
+      let message = err.message;
+      if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
+        message = "Account not found or incorrect password. Please sign up if you don't have an account.";
+      } else if (err.code === "auth/wrong-password") {
+        message = "Incorrect password. Please try again.";
+      }
+
+      toast({ title: "Login failed", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -82,9 +91,10 @@ export default function Auth() {
 
       toast({ title: "Welcome back!", description: `Successfully logged in as ${user.displayName || user.email}` });
       navigate("/dashboard");
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as any;
       console.error("Google Login Error:", error);
-      toast({ title: "Google Login failed", description: error.message, variant: "destructive" });
+      toast({ title: "Google Login failed", description: err.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -101,8 +111,9 @@ export default function Auth() {
       await sendPasswordResetEmail(auth, email);
       toast({ title: "Email sent", description: "Check your inbox for password reset instructions." });
       setMode("login");
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } catch (error: unknown) {
+      const err = error as any;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -154,9 +165,10 @@ export default function Auth() {
 
       setMode("login");
       setStep(1);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as any;
       console.error(error);
-      toast({ title: "Signup failed", description: error.message, variant: "destructive" });
+      toast({ title: "Signup failed", description: err.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }

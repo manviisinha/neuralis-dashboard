@@ -15,7 +15,7 @@ interface Medication {
   frequency: string;
   description?: string;
   category?: string;
-  prescribedAt: any;
+  prescribedAt: unknown;
   status: "active" | "discontinued";
 }
 
@@ -67,9 +67,10 @@ export default function Prescriptions() {
       }
       await deleteDoc(doc(db, collectionPath, id));
       toast({ title: "Medication Removed", description: "The medication has been deleted." });
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as any;
       console.error("Delete error:", error);
-      toast({ title: "Error", description: "Could not delete medication.", variant: "destructive" });
+      toast({ title: "Error", description: err.message || "Could not delete medication.", variant: "destructive" });
     }
   };
 
@@ -142,28 +143,38 @@ export default function Prescriptions() {
           </div>
         ) : (
           filteredMeds.map((med) => (
-            <div key={med.id} className="glass-card p-4 flex flex-col md:flex-row md:items-center gap-4 group">
+            <div key={med.id} className="glass-card p-5 flex flex-col md:flex-row md:items-center gap-4 group hover:border-primary/30 transition-all">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="font-display font-bold text-lg text-foreground">{med.name}</h3>
-                  {med.category && <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground uppercase tracking-wider">{med.category}</span>}
+                  {(med as any).tag && (
+                    <span className="text-[9px] px-2 py-0.5 rounded-md bg-primary/10 text-primary uppercase font-bold tracking-tight">
+                      {(med as any).tag}
+                    </span>
+                  )}
+                  {med.category && <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">{med.category}</span>}
                 </div>
-                <p className="text-sm text-muted-foreground line-clamp-1">{med.description || "No description available."}</p>
+                <p className="text-sm text-muted-foreground line-clamp-1 italic">{med.description || "Active prescription"}</p>
+
+                <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground uppercase tracking-widest font-medium">
+                  <Calendar className="w-3 h-3" />
+                  {(med as any).dateStr || (med.prescribedAt ? (med.prescribedAt as any).toDate().toLocaleDateString() : "New Entry")}
+                </div>
               </div>
 
-              <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                <div className="flex items-center gap-1.5 min-w-[100px]">
-                  <Pill className="w-4 h-4 text-primary/70" />
-                  <span>{med.dosage}</span>
+              <div className="flex items-center gap-6 text-sm text-white/80">
+                <div className="flex items-center gap-1.5 min-w-[100px] bg-secondary/30 px-3 py-1.5 rounded-lg border border-white/5">
+                  <Pill className="w-3.5 h-3.5 text-primary/70" />
+                  <span className="font-medium">{med.dosage}</span>
                 </div>
-                <div className="flex items-center gap-1.5 min-w-[120px]">
-                  <Clock className="w-4 h-4 text-neurora-indigo/70" />
-                  <span>{med.frequency}</span>
+                <div className="flex items-center gap-1.5 min-w-[120px] bg-secondary/30 px-3 py-1.5 rounded-lg border border-white/5">
+                  <Clock className="w-3.5 h-3.5 text-neurora-indigo/70" />
+                  <span className="font-medium">{med.frequency}</span>
                 </div>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  className="text-destructive/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
                   onClick={() => handleDelete(med.id)}
                 >
                   <Trash2 className="w-4 h-4" />

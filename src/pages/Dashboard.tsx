@@ -3,13 +3,12 @@ import { TrendingUp, TrendingDown, Minus, User, Phone, Mail, Calendar, AlertTria
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { MoleculeVisualization } from "@/components/MoleculeVisualization";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, query, collection } from "firebase/firestore";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Info, Pill } from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 import { useFamily } from "@/contexts/FamilyContext";
 import { Button } from "@/components/ui/button";
-import { collection, query, onSnapshot } from "firebase/firestore";
 import { DRUG_DATABASE } from "@/services/medicationKnowledgeBase";
 
 // Hardcoded data for visualization
@@ -35,12 +34,33 @@ const severityColor = (s: string) => {
   return "bg-neurora-mint/10 border-neurora-mint/30 text-neurora-mint";
 };
 
+interface PatientData {
+  full_name?: string;
+  email?: string;
+  phone?: string;
+  blood_group?: string;
+  date_of_birth?: string;
+  medical_conditions?: string;
+  isManaged?: boolean;
+}
+
+interface Medication {
+  id?: string;
+  name: string;
+  category?: string;
+  interactions?: { drug: string; description: string }[];
+  description?: string;
+  dosage?: string;
+  frequency?: string;
+  [key: string]: any; // Allow for other Firestore properties for now, but name is required
+}
+
 export default function Dashboard() {
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<PatientData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [medications, setMedications] = useState<any[]>([]);
+  const [medications, setMedications] = useState<Medication[]>([]);
   const [detectedConflicts, setDetectedConflicts] = useState<Conflict[]>([]);
-  const [selectedMed, setSelectedMed] = useState<any>(null);
+  const [selectedMed, setSelectedMed] = useState<Medication | null>(null);
   const [showAllConflicts, setShowAllConflicts] = useState(false);
   const { activeMember } = useFamily();
 
@@ -96,14 +116,14 @@ export default function Dashboard() {
 
     const q = query(collection(db, collectionPath));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const meds = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const meds = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Medication[];
       setMedications(meds);
 
       // Dynamic Conflict Detection
       const conflictsList: Conflict[] = [];
-      const medNames = meds.map((m: any) => m.name.toLowerCase());
+      const medNames = meds.map((m) => m.name.toLowerCase());
 
-      meds.forEach((med: any) => {
+      meds.forEach((med) => {
         const drugInfo = Object.values(DRUG_DATABASE).find(d =>
           d.name.toLowerCase() === med.name.toLowerCase()
         );
@@ -201,20 +221,29 @@ export default function Dashboard() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-secondary/20 p-2.5 rounded-lg border border-border/20">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1"><Droplets className="w-3 h-3" /> Blood</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1"><Droplets className="w-3 h-3" /> Blood Group</p>
                   <p className="font-semibold">{userData.blood_group || "--"}</p>
                 </div>
                 <div className="bg-secondary/20 p-2.5 rounded-lg border border-border/20">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" /> Age</p>
-                  <p className="font-semibold text-sm truncate">{userData.date_of_birth || "--"}</p>
+                  <p className="font-semibold text-sm">
+                    {userData.date_of_birth ? (() => {
+                      const birthDate = new Date(userData.date_of_birth);
+                      const today = new Date();
+                      let age = today.getFullYear() - birthDate.getFullYear();
+                      const m = today.getMonth() - birthDate.getMonth();
+                      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+                      return isNaN(age) ? "--" : age + " Years";
+                    })() : "--"}
+                  </p>
                 </div>
               </div>
 
               {userData.medical_conditions && (
                 <div className="pt-2 border-t border-border/20">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Medical Conditions</p>
-                  <p className="text-sm text-foreground/90 bg-secondary/20 p-3 rounded-lg border border-border/20 leading-relaxed">
-                    {userData.medical_conditions}
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Health Status</p>
+                  <p className="text-sm text-foreground/90 bg-secondary/10 p-3 rounded-lg border border-border/10 leading-relaxed italic">
+                    "{userData.medical_conditions}"
                   </p>
                 </div>
               )}
@@ -315,7 +344,7 @@ export default function Dashboard() {
                   </h2>
                 </div>
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {medications.map((m: any) => (
+                  {medications.map((m) => (
                     <button
                       key={m.id}
                       onClick={() => {
@@ -356,7 +385,7 @@ export default function Dashboard() {
                     {selectedMed?.interactions && selectedMed.interactions.length > 0 && (
                       <div className="space-y-2">
                         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Known Interactions</p>
-                        {selectedMed.interactions.map((int: any, i: number) => (
+                        {selectedMed.interactions.map((int: { drug: string; description: string }, i: number) => (
                           <div key={i} className="flex items-center gap-2 text-xs bg-destructive/5 p-2 rounded-lg border border-destructive/10">
                             <AlertTriangle className="w-3 h-3 text-destructive" />
                             <span className="font-medium text-destructive">{int.drug}:</span>

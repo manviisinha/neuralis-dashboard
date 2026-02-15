@@ -1,71 +1,83 @@
-# Neurora: AI-Powered Health Dashboard
+# Neuralis Dashboard
 
-Neurora is a modern, AI-driven healthcare management platform designed to simplify medication tracking, family health synchronization, and laboratory data analysis. Built with a focus on premium aesthetics and clinical safety, it provides real-time insights into your family's well-being.
+Neuralis is an advanced, AI-powered health monitoring dashboard designed to simplify complex medical data into actionable insights. It integrates lab report analysis, medication conflict detection, real-time doctor availability, and intelligent conversational assistance.
 
 ## 🚀 Key Features
 
-### 1. **AI Prescription Scanner**
-- **Handwriting OCR**: Leverages Google Cloud Vision API to extract medication names, dosages, and frequencies from physical prescription images.
-- **Smart Enrichment**: Automatically identifies medication categories and provides clinical impact descriptions for scanned drugs.
-- **Image Persistence**: Saves a digital copy of every prescription to Firebase Storage for future reference.
+### 1. **MediScanner (OCR Prescription Analysis)**
+   - Simply upload an image of your prescription.
+   - Using advanced OCR (EasyOCR + OpenCV), the backend extracts medication names, dosages, and instructions.
+   - Automatically populates your digital medicine cabinet.
 
-### 2. **Clinical Conflict Shield**
-- **Dynamic Interaction Engine**: Real-time cross-referencing of your entire medication profile to detect dangerous drug-drug interactions.
-- **Visual Alerts**: Severity-coded alerts (High/Medium/Low) on the dashboard with detailed clinical explanations in the "Conflict Analysis" modal.
+### 2. **Conflict Engine**
+   - **Real-time Drug Interaction Checks**: Analyzes your current medication list against a comprehensive drug interaction database.
+   - Detects potential conflicts (e.g., "Aspirin + Ibuprofen") and warns about severity levels.
+   - Provides clear, actionable advice on managing multiple prescriptions.
+   
+### 3. **Lab Analytics & Trends**
+   - **Smart Trend Analysis**: Upload multiple lab reports (blood tests, lipid profiles, etc.).
+   - The system normalizes test names (e.g., grouping "Fasting Sugar" and "Glucose") to track historical trends.
+   - Visualizes your progress with dynamic charts:
+     - **Wellness Snapshot**: Quick view of latest vitals.
+     - **Trend Indicators**: Know instantly if a biomarker is "Stable", "Improving", or "Degrading".
 
-### 3. **Medicine Knowledge Engine**
-- **Interactive Pills**: A visual repository of your active medications.
-- **Clinical Insights**: Click any medication to view detailed usage notes, molecular structural analysis (visualized), and known interactions within a premium modal interface.
+### 4. **Aura AI Assistant**
+   - A conversational AI integrated directly into the dashboard.
+   - **Context-Aware**: Understands your specific health data.
+     - *"What are my current medicines?"*
+     - *"Any conflicts in my prescription?"*
+     - *"Show my last cholesterol reading."*
+   - Provides instant, data-driven answers without generic web searches.
 
-### 4. **Lab Analytics & Trends**
-- **Historical Comparison**: Automatically compares new lab results (Glucose, HbA1c, Cholesterol, etc.) with previous data.
-- **Trend Detection**: Color-coded indicators (Improved/Degraded/Stable) show health progression over time using dynamic charting.
+### 5. **Expert Locator (Live Map)**
+   - Find specialists near you with our **Live Expert Map**.
+   - **Dynamic Filtering**: Filter by specialty (Cardiologist, Dermatologist, etc.) and distance radius.
+   - **Real-Time Visualization**: The map automatically adjusts its zoom and focus based on your search criteria.
 
-### 5. **Family Health Hub**
-- **Multi-Member Management**: Switch between family profiles (Primary, Spouse, Children) to manage their records independently.
-- **Real-time Sync**: All health data is synchronized across devices using Firebase Firestore.
+### 6. **Emergency SOS**
+   - A dedicated, always-accessible SOS button.
+   - One-tap connection to emergency services (112) with safeguard confirmation.
 
-## 🛠️ Technology Stack
+## 🛠️ Tech Stack
 
-- **Frontend**: React 18, Vite, TypeScript
-- **Styling**: Tailwind CSS (Glassmorphism & Dark Mode)
-- **UI Components**: Shadcn/UI, Lucide React
-- **Charts**: Recharts
-- **Backend/BaaS**: 
-  - **Firebase Auth**: Secure multi-factor authentication and social logins.
-  - **Firestore**: Real-time NoSQL database for health records.
-  - **Firebase Storage**: Secure medical document and image storage.
-- **AI Integration**: Google Cloud Vision (OCR DOCUMENT_TEXT_DETECTION)
+- **Frontend**: React, TypeScript, Tailwind CSS, Recharts, Lucide Icons, Vite
+- **Backend**: Python (FastAPI), Uvicorn, EasyOCR, OpenCV, NumPy
+- **Database & Auth**: Firebase (Firestore, Authentication)
+- **Deployment**: Vercel (Frontend), Railway/Render (Backend recommended)
 
-## 📦 Getting Started
+## 📦 Installation & Setup
 
 ### Prerequisites
 - Node.js (v18+)
-- npm or bun
+- Python (v3.9+)
 
-### Installation
+### Frontend
+```bash
+# Install dependencies
+npm install
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/manviisinha/neuralis-dashboard.git
-   ```
+# Start development server
+npm run dev
+```
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+### Backend
+```bash
+cd server
 
-3. Set up Environment Variables:
-   Create a `.env` file in the root and add your Firebase and Vision API keys:
-   ```env
-   VITE_FIREBASE_API_KEY=your_key
-   ...
-   ```
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-4. Run the development server:
-   ```bash
-   npm run dev
-   ```
+# Install dependencies
+pip install -r requirements.txt
+
+# Start the OCR server
+python main.py
+```
+
+## 🔒 Security & Privacy
+- **Strict Access Control**: Users must sign up and verify email to access the dashboard.
+- **Data Privacy**: All medical data is stored securely in Firestore with user-scoped permissions.
 
 ---
-*Disclaimer: This dashboard is a clinical tool for monitoring and educational purposes. Always consult with a qualified healthcare professional before making medical decisions.*
+*Built with ❤️ by the Neuralis Team*

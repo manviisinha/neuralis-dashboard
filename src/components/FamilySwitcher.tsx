@@ -44,11 +44,12 @@ export function FamilySwitcher() {
           ? `Invitation sent to ${newMemberEmail}`
           : `${newMemberName} added to family.`
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as any;
       console.error("Add member error:", error);
       toast({
         title: "Error adding member",
-        description: error.message || "Please check your connection and try again.",
+        description: err.message || "Please check your connection and try again.",
         variant: "destructive"
       });
     }
